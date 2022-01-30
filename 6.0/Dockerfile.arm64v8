@@ -1,5 +1,7 @@
 FROM arm64v8/alpine:latest AS builder
 
+COPY qemu-aarch64-static /usr/bin
+
 RUN apk add \
         automake \
         autoconf \
@@ -32,6 +34,17 @@ RUN apk add \
         zlib-dev
 
 ARG VERSION
+ARG NETMAP
+
+WORKDIR /src
+
+WORKDIR /src/netmap
+
+RUN if [ "${NETMAP}" = "yes" ]; then \
+        git clone https://github.com/luigirizzo/netmap; \
+        cd /src/netmap/netmap; \
+        git checkout -b infiot-netmap 9083fe492efc70fa98d103d1eba4ebfa4ce33844; \
+fi
 
 WORKDIR /src
 
@@ -50,26 +63,47 @@ WORKDIR /src/suricata-${VERSION}
 
 ARG CONFIGURE_ARGS
 
-RUN ./configure \
-        --prefix=/usr \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
-        --disable-shared \
-        --disable-gccmarch-native \
-        --enable-ebpf \
-        --enable-nfqueue \
-        --enable-hiredis \
-	${CONFIGURE_ARGS}
+RUN if [ "${NETMAP}" = "yes" ]; then \
+        CPATH=/src/netmap/netmap/sys ./configure \
+                --prefix=/usr \
+                --sysconfdir=/etc \
+                --localstatedir=/var \
+                --disable-shared \
+                --disable-gccmarch-native \
+                --enable-ebpf \
+                --enable-nfqueue \
+                --enable-netmap \
+                --with-netmap-includes="/src/netmap/netmap/sys/" \
+                --with-netmap-libraries="/src/netmap/netmap/" \
+                --enable-hiredis \
+	        ${CONFIGURE_ARGS} ; \
+else \
+        ./configure \
+                --prefix=/usr \
+                --sysconfdir=/etc \
+                --localstatedir=/var \
+                --disable-shared \
+                --disable-gccmarch-native \
+                --enable-ebpf \
+                --enable-nfqueue \
+                --enable-hiredis \
+	        ${CONFIGURE_ARGS} ; \
+fi
 
 ARG CORES=2
 
-RUN make -j "${CORES}"
+RUN if [ "${NETMAP}" = "yes" ]; then \
+        CPATH=/src/netmap/netmap/sys make -j "${CORES}"; \
+else \
+        make -j "${CORES}"; \
+fi
 
 RUN make install install-conf DESTDIR=/fakeroot
 
 # Something about the Docker mounts won't let us copy /var/run in the
 # next stage.
 RUN rm -rf /fakeroot/var
+RUN rm -rf /fakeroot/netmap
 
 FROM arm64v8/alpine:latest AS runner
 

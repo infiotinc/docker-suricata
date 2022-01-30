@@ -36,7 +36,7 @@ if [ $# -gt 0 -a "${1:0:1}" != "-" ]; then
     exec $@
 fi
 
-run_as_user="yes"
+run_as_user="no"
 
 check_for_cap() {
     echo -n "Checking for capability $1: "
