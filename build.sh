@@ -11,6 +11,7 @@ fi
 MAJOR=$(basename $(pwd))
 VERSION=$(cat VERSION)
 LATEST=$(cat ../LATEST)
+NETMAP=$(echo $NETMAP)
 
 manifest_only="no"
 
@@ -77,6 +78,7 @@ build() {
                --rm \
 	       --build-arg VERSION="${VERSION}" \
                --build-arg CORES="${CORES}" \
+               --build-arg NETMAP="${NETMAP}" \
                --build-arg CONFIGURE_ARGS="${configure_args}" \
                --tag "${tag}" \
                -f Dockerfile.${arch} \
